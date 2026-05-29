@@ -273,6 +273,8 @@ td.date-cell {
 td.date-cell.v-ok   { font-weight: 700; color: var(--ok);   }
 td.date-cell.v-warn { font-weight: 700; color: var(--warn); }
 td.date-cell.v-err  { font-weight: 700; color: var(--err);  }
+td.date-cell.v-all  { font-weight: 700; color: #1d4ed8;     }
+[data-theme="dark"] td.date-cell.v-all { color: #60a5fa; }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
 .empty-msg {

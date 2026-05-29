@@ -254,7 +254,17 @@ function renderPivot(pairs, dates, lookup, mostrar) {
   empresaOrder.forEach((e, i) => { grpIdx[e] = i; });
 
   const emittedEmpresa = new Set();
-  const valCls = mostrar === 'standby' ? 'v-warn' : mostrar === 'averia' ? 'v-err' : 'v-ok';
+  const valCls = mostrar === 'standby' ? 'v-warn'
+               : mostrar === 'averia'  ? 'v-err'
+               : mostrar === 'todos'   ? 'v-all'
+               : 'v-ok';
+
+  const getN = (val) => {
+    if (!val) return 0;
+    return mostrar === 'todos'
+      ? val.disponible + val.standby + val.averia
+      : val[mostrar];
+  };
 
   tbody.innerHTML = pairs.map(({ empresa, equipo }) => {
     const gid  = grpIdx[empresa];
@@ -269,7 +279,7 @@ function renderPivot(pairs, dates, lookup, mostrar) {
 
     const cells = dates.map(d => {
       const val = lookup[`${empresa}\x00${equipo}\x00${d}`];
-      const n   = val ? val[mostrar] : 0;
+      const n   = getN(val);
       return n > 0
         ? `<td class="date-cell ${valCls}">${n}</td>`
         : `<td class="date-cell"></td>`;
@@ -339,9 +349,9 @@ function updateRowCount(rows, cols) {
 // ── Export ────────────────────────────────────────────────────────────────────
 function exportExcel() {
   if (!allRecords.length) { showToast('Sin datos para exportar', true); return; }
-  showToast('Generando Excel…', false, 10000);
+  showToast('Gerando Excel…', false, 10000);
   try {
-    // Re-compute current pivot data for export
+    // ── Re-compute pivot data ─────────────────────────────────────────────
     const dateFrom = document.getElementById('fDateFrom').value;
     const dateTo   = document.getElementById('fDateTo').value;
     const fEmpresa = document.getElementById('fEmpresa').value;
@@ -358,9 +368,9 @@ function exportExcel() {
       return true;
     });
 
-    const datesSet = new Set(recs.map(r => r.fechaISO).filter(Boolean));
-    const dates    = [...datesSet].sort();
-    const lookup   = Object.create(null);
+    const dates = [...new Set(recs.map(r => r.fechaISO).filter(Boolean))].sort();
+
+    const lookup = Object.create(null);
     for (const r of recs) {
       if (!r.fechaISO) continue;
       const key = `${r.empresa}\x00${r.equipo}\x00${r.fechaISO}`;
@@ -369,30 +379,91 @@ function exportExcel() {
       lookup[key].standby    += r.standby;
       lookup[key].averia     += r.averia;
     }
+
     const pairsMap = Object.create(null);
     for (const r of recs) pairsMap[`${r.empresa}\x00${r.equipo}`] = true;
     const pairs = Object.keys(pairsMap)
       .map(k => { const [empresa, equipo] = k.split('\x00'); return { empresa, equipo }; })
-      .sort((a, b) => a.empresa.localeCompare(b.empresa) || a.equipo.localeCompare(b.equipo));
+      .sort((a, b) => a.empresa.localeCompare(b.empresa) * sortEmpresa || a.equipo.localeCompare(b.equipo) * sortEquipo);
 
-    // Build AOA
-    const header = ['Empresa', 'Listado maquinaría', ...dates.map(fmtDateHdr)];
-    const rows   = pairs.map(({ empresa, equipo }) => {
+    const empresaOrder = [];
+    const seenE = new Set();
+    pairs.forEach(({ empresa }) => { if (!seenE.has(empresa)) { empresaOrder.push(empresa); seenE.add(empresa); } });
+    const grpIdx = Object.create(null);
+    empresaOrder.forEach((e, i) => { grpIdx[e] = i; });
+
+    const getNVal = (val) => {
+      if (!val) return 0;
+      return mostrar === 'todos' ? val.disponible + val.standby + val.averia : val[mostrar];
+    };
+
+    // ── Colour palette ────────────────────────────────────────────────────
+    const GRP  = ['#EEF8F1', '#FFFFFF'];
+    const VCLR = { disponible: '#16A34A', standby: '#D97706', averia: '#C00000', todos: '#1D4ED8' };
+    const vc   = VCLR[mostrar] || '#16A34A';
+
+    // ── Inline CSS helpers ────────────────────────────────────────────────
+    const td  = (bg, extra = '') =>
+      `background:${bg};padding:5px 8px;border:1px solid #d1dce8;font-size:10pt;${extra}`;
+    const th  = (extra = '') =>
+      `background:#003973;color:#fff;font-weight:bold;padding:6px 8px;border:1px solid #002a58;font-size:10pt;${extra}`;
+
+    // ── Build HTML table ──────────────────────────────────────────────────
+    let rows = `<tr>
+      <th style="${th()}">Empresa</th>
+      <th style="${th()}">Listado maquinaría</th>
+      ${dates.map(d => `<th style="${th('text-align:center;white-space:nowrap;')}">${fmtDateHdr(d)}</th>`).join('')}
+    </tr>`;
+
+    pairs.forEach(({ empresa, equipo }) => {
+      const bg  = GRP[grpIdx[empresa] % 2];
+      const emp = td(bg, 'color:#003973;font-weight:bold;border-left:3px solid #003973;');
+      const eq  = td(bg);
       const cells = dates.map(d => {
-        const val = lookup[`${empresa}\x00${equipo}\x00${d}`];
-        return val ? (val[mostrar] || '') : '';
-      });
-      return [empresa, equipo, ...cells];
+        const n = getNVal(lookup[`${empresa}\x00${equipo}\x00${d}`] || null);
+        const s = n > 0
+          ? td(bg, `color:${vc};font-weight:bold;text-align:center;`)
+          : td(bg, 'text-align:center;color:#c8d4e0;');
+        return `<td style="${s}">${n > 0 ? n : ''}</td>`;
+      }).join('');
+      rows += `<tr>
+        <td style="${emp}">${empresa}</td>
+        <td style="${eq}">${equipo}</td>
+        ${cells}
+      </tr>`;
     });
 
-    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    // Column widths
-    ws['!cols'] = [{ wch: 20 }, { wch: 26 }, ...dates.map(() => ({ wch: 12 }))];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Equipos_Pivot');
-    XLSX.writeFile(wb, 'Equipos_Maquinaria_Pivot.xlsx');
-    showToast('Excel exportado con éxito');
+    const table = `<table style="border-collapse:collapse;font-family:Calibri,Arial;font-size:10pt;">${rows}</table>`;
+
+    // ── Wrap in Excel-compatible HTML ─────────────────────────────────────
+    const xls = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:x="urn:schemas-microsoft-com:office:excel"
+      xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="UTF-8">
+      <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+        <x:ExcelWorksheet><x:Name>Equipos_Pivot</x:Name>
+          <x:WorksheetOptions><x:FreezePanes/>
+            <x:SplitHorizontal>1</x:SplitHorizontal>
+            <x:TopRowBottomPane>1</x:TopRowBottomPane>
+            <x:SplitVertical>2</x:SplitVertical>
+            <x:LeftColumnRightPane>2</x:LeftColumnRightPane>
+          </x:WorksheetOptions>
+        </x:ExcelWorksheet>
+      </x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+      </head><body>${table}</body></html>`;
+
+    const blob = new Blob(['﻿' + xls], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'Equipos_Maquinaria.xls';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast('Excel exportado ✓');
   } catch (err) {
+    console.error('[exportExcel]', err);
     showToast('Error al exportar: ' + err.message, true);
   }
 }
