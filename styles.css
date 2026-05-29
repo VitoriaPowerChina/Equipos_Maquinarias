@@ -117,7 +117,67 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 }
 .btn-export:hover { background: var(--primary-d); }
 
-/* ── Pivot table wrap ────────────────────────────────────────────────────── */
+/* ── Files panel ─────────────────────────────────────────────────────────── */
+.files-panel {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  margin-bottom: 6px;
+  box-shadow: var(--shadow);
+}
+.files-label {
+  font-size: .74rem;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.file-pills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+}
+.file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 6px 2px 9px;
+  font-size: .74rem;
+  color: var(--text);
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.file-pill .pill-num {
+  font-size: .68rem;
+  color: var(--muted);
+  margin-left: 2px;
+}
+.file-pill .pill-rm {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: .72rem;
+  padding: 1px 3px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  line-height: 1;
+  transition: all .12s ease;
+  flex-shrink: 0;
+}
+.file-pill .pill-rm:hover { background: var(--err); color: #fff; }
+
+/* ── Pivot table wrap ─────────────────────────────────────────────────────── */
 .table-wrap {
   overflow: auto;
   background: var(--surface);

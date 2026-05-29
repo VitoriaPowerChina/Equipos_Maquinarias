@@ -46,8 +46,65 @@ async function loadFiles(fileList) {
   chip.textContent = `${loadedFiles.size} DPR${loadedFiles.size !== 1 ? 's' : ''}`;
   chip.style.display = '';
 
+  renderFilePills();
+
   const inp = document.getElementById('fileMore');
   if (inp) inp.value = '';
+}
+
+// ── Date pills — one pill per date, sorted chronologically ───────────────────
+function renderFilePills() {
+  const panel     = document.getElementById('filesPanel');
+  const container = document.getElementById('filePills');
+  if (!panel || !container) return;
+
+  if (!allRecords.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+
+  // Group record count by date
+  const countByDate = Object.create(null);
+  allRecords.forEach(r => {
+    if (r.fechaISO) countByDate[r.fechaISO] = (countByDate[r.fechaISO] || 0) + 1;
+  });
+
+  // Sort dates ascending (ISO string sort = chronological)
+  const sortedDates = Object.keys(countByDate).sort();
+
+  container.innerHTML = sortedDates.map(iso => {
+    const label = fmtDateHdr(iso);   // DD-MM-YYYY
+    const n     = countByDate[iso];
+    return `<span class="file-pill" title="${iso}">
+      <i class="bi bi-calendar3" style="color:var(--primary);font-size:.78rem;flex-shrink:0;"></i>
+      ${label}
+      <span class="pill-num">(${n})</span>
+      <button class="pill-rm" onclick="removeByDate('${iso}')" title="Remover este dia">✕</button>
+    </span>`;
+  }).join('');
+}
+
+/** Remove all records for a given date and clean up loadedFiles for orphaned filenames. */
+function removeByDate(dateISO) {
+  // Find filenames whose ALL records are on this date (so they can be re-imported)
+  const filesOnDate  = new Set(allRecords.filter(r => r.fechaISO === dateISO).map(r => r.fileName));
+  const filesOnOther = new Set(allRecords.filter(r => r.fechaISO !== dateISO).map(r => r.fileName));
+
+  // Remove records for this date
+  allRecords = allRecords.filter(r => r.fechaISO !== dateISO);
+
+  // Remove from loadedFiles only filenames that are now fully gone (no remaining records)
+  filesOnDate.forEach(fn => { if (!filesOnOther.has(fn)) loadedFiles.delete(fn); });
+
+  renderFilePills();
+  rebuildFilterOptions();
+  applyFilters();
+  updateKPIs();
+
+  const chip = document.getElementById('statusChip');
+  if (loadedFiles.size) {
+    chip.textContent = `${loadedFiles.size} DPR${loadedFiles.size !== 1 ? 's' : ''}`;
+  } else {
+    chip.style.display = 'none';
+  }
 }
 
 // ── DPR Parser ────────────────────────────────────────────────────────────────
